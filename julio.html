@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maquipan PRO | Bodega de Repuestos</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root { 
+            --bg-body: #f0f2f5; 
+            --surface: rgba(255, 255, 255, 0.85); 
+            --primary: #2c3e50; 
+            --radius: 16px; 
+            --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07); 
+        }
+        
+        body { 
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-family: 'Poppins', sans-serif; 
+            color: #333; 
+            padding-bottom: 80px; 
+            background-attachment: fixed;
+        }
+        
+        /* EFECTO CRISTAL */
+        .glass {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: var(--shadow);
+        }
+
+        .navbar-custom { padding: 1rem 0; position: sticky; top: 0; z-index: 1000; transition: 0.3s; }
+        
+        /* BOTONES E INPUTS */
+        .btn { border-radius: 10px; transition: 0.2s; font-weight: 500; }
+        .btn:active { transform: scale(0.95); }
+        .btn-icon { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: none; cursor:pointer; transition:0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .btn-icon:hover { transform: translateY(-2px); box-shadow: 0 5px 10px rgba(0,0,0,0.1); }
+        
+        /* CHAT / BITÁCORA */
+        .chat-box { max-height: 300px; overflow-y: auto; background: #f8fafc; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }
+        .chat-bubble { padding: 10px 14px; border-radius: 12px; font-size: 0.85rem; max-width: 90%; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .chat-bubble.system { background: #e2e8f0; color: #475569; align-self: center; font-style: italic; font-size: 0.75rem; border-radius: 20px; }
+        .chat-bubble.user { background: #fff; border-bottom-left-radius: 2px; border: 1px solid #e2e8f0; color: #1e293b; align-self: flex-start; }
+
+        .qr-container { background: white; padding: 15px; border-radius: 16px; border: 1px solid #e2e8f0; display: inline-block; margin: 15px auto;}
+        
+        /* ESTILOS DE TABLA */
+        .table-custom th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; background: rgba(255,255,255,0.5); }
+        .table-custom td { vertical-align: middle; font-size: 0.85rem; }
+        .status-select { font-size: 0.8rem; font-weight: 600; border-radius: 8px; padding: 4px 8px; cursor: pointer; border: 1px solid #e2e8f0;}
+
+        /* INDICADOR DE CONEXIÓN */
+        #statusConexion { font-size: 0.75rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar-custom glass mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
+                <i class="fas fa-layer-group text-primary"></i> MAQUIPAN 
+                <span class="badge bg-light text-secondary border rounded-pill fw-normal" style="font-size:0.6em">BODEGA REPUESTOS</span>
+            </h5>
+            <div class="d-flex align-items-center bg-white rounded-pill px-3 py-1 border gap-2 shadow-sm">
+                <span id="statusConexion" class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Conectando...</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <div class="card border-0 shadow-sm glass p-4 mb-4 animate__animated animate__fadeInDown">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary fw-bold"><i class="fas fa-plus-circle me-2"></i>Nuevo Ingreso a Bodega</h5>
+            </div>
+            
+            <form id="formRepuestos">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            <input type="text" class="form-control rounded-3" id="nombre" placeholder="." required>
+                            <label>Repuesto / Componente</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            <input type="text" class="form-control rounded-3" id="numeroParte" placeholder="." required>
+                            <label>Número de Parte (N/P)</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            <input type="text" class="form-control rounded-3" id="nombreCliente" placeholder="." required>
+                            <label>Nombre del Cliente / Local</label>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            <select class="form-select rounded-3 fw-bold text-primary" id="origen" required>
+                                <option value="">Seleccione...</option>
+                                <option value="POST VENTA">POST VENTA</option>
+                                <option value="TALLER">TALLER</option>
+                                <option value="SISA">SISA</option>
+                                <option value="TOTTUS">TOTTUS</option>
+                                <option value="HIPER LIDER">HIPER LIDER</option>
+                                <option value="SBA">SBA</option>
+                                <option value="EXPRESS LIDER">EXPRESS LIDER</option>
+                                <option value="CANAL TRADICIONAL">CANAL TRADICIONAL</option>
+                                <option value="MONTAJE">MONTAJE</option>
+                            </select>
+                            <label>Origen / Área</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            <input type="text" class="form-control rounded-3" id="personaEntrega" placeholder="." required>
+                            <label>Entregado por (Técnico)</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            <select class="form-select rounded-3 fw-bold" id="estadoInicial" required>
+                                <option value="Ingresado">Ingresado</option>
+                                <option value="En revisión">En revisión</option>
+                                <option value="Operativo">Operativo</option>
+                                <option value="Sin reparación">Sin reparación</option>
+                                <option value="Para stock">Para stock</option>
+                            </select>
+                            <label>Estado Inicial</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            <input type="date" class="form-control rounded-3" id="fechaIngreso" required>
+                            <label>Fecha de Ingreso</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-floating">
+                            <textarea class="form-control rounded-3" id="observaciones" placeholder="." style="height: 80px"></textarea>
+                            <label>Observaciones (Falla, condición, detalles extra...)</label>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 text-end mt-4">
+                        <button type="submit" class="btn btn-primary px-5 fw-bold rounded-pill shadow-lg">
+                            <i class="fas fa-qrcode me-2"></i>Guardar y Generar QR
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-3 animate__animated animate__fadeInUp">
+            <h5 class="mb-0 fw-bold text-secondary"><i class="fas fa-list-ul me-2"></i>Inventario en Vivo</h5>
+            
+            <div class="d-flex bg-white p-2 rounded-pill shadow-sm border align-items-center flex-grow-1" style="max-width: 500px;">
+                <i class="fas fa-search text-muted ms-3 me-2"></i>
+                <input type="text" id="buscadorUniversal" class="form-control border-0 bg-transparent shadow-none" placeholder="Escanear QR o buscar repuesto, cliente, folio...">
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm glass p-3 mb-5 animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+            <div class="table-responsive">
+                <table class="table table-hover table-custom align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>N° Ingreso</th>
+                            <th>Repuesto</th>
+                            <th>Procedencia</th>
+                            <th>Fechas</th>
+                            <th>Estado Actual</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCuerpo">
+                        <tr><td colspan="6" class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i> Cargando base de datos...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalBitacora" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                <div class="modal-header border-0 pb-0 bg-light rounded-top-4 p-4">
+                    <h5 class="modal-title fw-bold text-primary"><i class="fas fa-book me-2"></i>Bitácora: <span id="modalTituloId"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 bg-light rounded-bottom-4">
+                    
+                    <div id="cajaHistorial" class="chat-box mb-4 d-flex flex-column"></div>
+                    
+                    <div class="form-floating mb-3">
+                        <textarea class="form-control rounded-3" id="nuevaObservacion" placeholder="." style="height: 80px"></textarea>
+                        <label>Agregar actualización al historial...</label>
+                    </div>
+                    <button onclick="guardarNuevaObservacion()" class="btn btn-primary w-100 fw-bold rounded-3 py-2 shadow-sm">
+                        <i class="fas fa-paper-plane me-2"></i>Registrar en Bitácora
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalQR" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg text-center p-4" style="border-radius: 20px;">
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+                <h5 class="fw-bold text-primary mb-0 mt-2" id="qrTituloIngreso"></h5>
+                <small class="text-muted d-block mb-3" id="qrSubtitulo"></small>
+                
+                <div class="qr-container shadow-sm" id="qrContenedor"></div>
+                
+                <p class="small text-muted mb-0 mt-2">Pega este QR físicamente en el repuesto.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // --- 1. CONFIGURACIÓN FIREBASE (Tus credenciales de Maquipan) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyA3VJCKWrgIU0OrT3nVfiE3DOi5geDuRd8",
+  authDomain: "julio-c3310.firebaseapp.com",
+  projectId: "julio-c3310",
+  storageBucket: "julio-c3310.firebasestorage.app",
+  messagingSenderId: "866088221446",
+  appId: "1:866088221446:web:59b27c76ee630d94543c87"
+};
+
+        // Inicializar Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            
+            // Cambiar indicador visual
+            const statusBadge = document.getElementById('statusConexion');
+            statusBadge.innerHTML = '<i class="fas fa-wifi me-1"></i> En línea';
+            statusBadge.className = 'text-success';
+        } catch (e) {
+            console.error("Error al conectar con Firebase:", e);
+            document.getElementById('statusConexion').innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Error de conexión';
+            document.getElementById('statusConexion').className = 'text-danger';
+        }
+
+        // Variables Globales
+        let inventario = [];
+        let idRepuestoActual = null; 
+        let bitacoraModalInst;
+        let qrModalInst;
+
+        // --- 2. INICIALIZACIÓN Y ESCUCHA EN TIEMPO REAL ---
+        document.addEventListener("DOMContentLoaded", function() {
+            bitacoraModalInst = new bootstrap.Modal(document.getElementById('modalBitacora'));
+            qrModalInst = new bootstrap.Modal(document.getElementById('modalQR'));
+            document.getElementById('fechaIngreso').valueAsDate = new Date();
+
+            // Escuchar cambios en la base de datos (Realtime)
+            if(db) {
+                db.ref('bodega_repuestos').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        // Convertir el objeto de Firebase a Array y ordenarlo por fecha (más nuevo arriba)
+                        inventario = Object.values(data).sort((a, b) => b.id - a.id);
+                    } else {
+                        inventario = [];
+                    }
+                    ejecutarBusqueda(); // Renderizar tabla con la información fresquita
+                });
+            }
+
+            // Búsqueda por URL (QR celular)
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('buscar')) {
+                document.getElementById('buscadorUniversal').value = params.get('buscar');
+            }
+        });
+
+        // UTILIDADES
+        function generarNumeroIngreso() { return 'ING-' + Math.floor(10000 + Math.random() * 90000); }
+        function obtenerFechaHoraActual() { return new Date().toLocaleString('es-CL'); }
+
+        // --- 3. BUSCADOR EN VIVO ---
+        const buscador = document.getElementById('buscadorUniversal');
+        function ejecutarBusqueda() {
+            const term = buscador.value.toLowerCase().trim();
+            if (term === '') { actualizarTabla(inventario); return; }
+
+            const filtrados = inventario.filter(i => 
+                (i.numeroIngreso && i.numeroIngreso.toLowerCase().includes(term)) ||
+                (i.nombre && i.nombre.toLowerCase().includes(term)) ||
+                (i.numeroParte && i.numeroParte.toLowerCase().includes(term)) ||
+                (i.nombreCliente && i.nombreCliente.toLowerCase().includes(term)) ||
+                (i.origen && i.origen.toLowerCase().includes(term))
+            );
+            actualizarTabla(filtrados);
+        }
+        buscador.addEventListener('input', ejecutarBusqueda);
+
+        // --- 4. REGISTRAR NUEVO REPUESTO EN FIREBASE ---
+        document.getElementById('formRepuestos').addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            const nombre = document.getElementById('nombre').value;
+            const numeroParte = document.getElementById('numeroParte').value;
+            const nombreCliente = document.getElementById('nombreCliente').value;
+            const origen = document.getElementById('origen').value;
+            const personaEntrega = document.getElementById('personaEntrega').value;
+            const fechaIngreso = document.getElementById('fechaIngreso').value;
+            const estado = document.getElementById('estadoInicial').value;
+            const obs = document.getElementById('observaciones').value;
+
+            let textoIngreso = `Ingreso desde: ${origen} | Entregado por: ${personaEntrega}.`;
+            if (obs) textoIngreso += `<br>📝 Nota: ${obs}`;
+
+            const idGenerado = Date.now();
+            const numIngreso = generarNumeroIngreso();
+
+            const nuevoItem = {
+                id: idGenerado, 
+                numeroIngreso: numIngreso, 
+                nombre: nombre, 
+                numeroParte: numeroParte,
+                nombreCliente: nombreCliente, 
+                origen: origen, 
+                personaEntrega: personaEntrega,
+                fechaIngreso: fechaIngreso, 
+                fechaSalida: "", 
+                estado: estado,
+                bitacora: [{ fecha: obtenerFechaHoraActual(), texto: textoIngreso }]
+            };
+
+            // Guardar en Firebase (Esto disparará automáticamente el .on('value') y actualizará la tabla)
+            db.ref('bodega_repuestos/' + idGenerado).set(nuevoItem)
+                .then(() => {
+                    this.reset(); 
+                    document.getElementById('fechaIngreso').valueAsDate = new Date();
+                    abrirQR(numIngreso, nombre, numeroParte);
+                })
+                .catch(err => alert("Error al guardar en la nube: " + err.message));
+        });
+
+        // --- 5. RENDERIZAR TABLA ---
+        function actualizarTabla(datos) {
+            const cuerpo = document.getElementById('tablaCuerpo');
+            cuerpo.innerHTML = ''; 
+
+            if(datos.length === 0) {
+                cuerpo.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-box-open fa-3x mb-3 opacity-25 d-block"></i> Bodega vacía o sin resultados</td></tr>`;
+                return;
+            }
+
+            datos.forEach(item => {
+                let badgeClass = "bg-primary";
+                if(item.estado === "Ingresado") badgeClass = "bg-info text-dark";
+                if(item.estado === "En revisión") badgeClass = "bg-warning text-dark";
+                if(item.estado === "Sin reparación") badgeClass = "bg-danger";
+                if(item.estado === "Entregado") badgeClass = "bg-success";
+                if(item.estado === "Para stock") badgeClass = "bg-secondary";
+
+                cuerpo.innerHTML += `
+                    <tr>
+                        <td>
+                            <span class="badge bg-dark rounded-pill shadow-sm py-2 px-3">${item.numeroIngreso}</span>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">${item.nombre}</div>
+                            <small class="text-muted"><i class="fas fa-barcode"></i> N/P: ${item.numeroParte}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-primary border mb-1">${item.origen}</span><br>
+                            <small class="text-muted fw-bold d-block"><i class="fas fa-store"></i> ${item.nombreCliente}</small>
+                            <small class="text-muted"><i class="fas fa-user"></i> ${item.personaEntrega}</small>
+                        </td>
+                        <td>
+                            <div class="small text-muted"><i class="fas fa-arrow-right text-success"></i> In: ${item.fechaIngreso}</div>
+                            <div class="small text-muted"><i class="fas fa-arrow-left text-danger"></i> Out: ${item.fechaSalida || '--'}</div>
+                        </td>
+                        <td>
+                            <select class="form-select status-select shadow-sm ${badgeClass} border-0 bg-opacity-75 text-white" onchange="cambiarEstado(${item.id}, this.value)">
+                                <option class="bg-white text-dark" value="Ingresado" ${item.estado==='Ingresado'?'selected':''}>Ingresado</option>
+                                <option class="bg-white text-dark" value="En revisión" ${item.estado==='En revisión'?'selected':''}>En revisión</option>
+                                <option class="bg-white text-dark" value="Operativo" ${item.estado==='Operativo'?'selected':''}>Operativo</option>
+                                <option class="bg-white text-dark" value="Sin reparación" ${item.estado==='Sin reparación'?'selected':''}>Sin rep.</option>
+                                <option class="bg-white text-dark" value="Para stock" ${item.estado==='Para stock'?'selected':''}>Stock</option>
+                                <option class="bg-white text-dark" value="Entregado" ${item.estado==='Entregado'?'selected':''}>Entregado</option>
+                            </select>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                                <button class="btn-icon bg-white text-primary border" onclick="abrirQR('${item.numeroIngreso}', '${item.nombre}', '${item.numeroParte}')" title="Código QR"><i class="fas fa-qrcode"></i></button>
+                                <button class="btn-icon bg-white text-success border" onclick="abrirBitacora(${item.id})" title="Bitácora"><i class="fas fa-book"></i></button>
+                                <button class="btn-icon bg-white text-danger border" onclick="eliminarItem(${item.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- 6. CAMBIOS Y ELIMINACIÓN EN FIREBASE ---
+        function cambiarEstado(id, nuevoEstado) {
+            const item = inventario.find(i => i.id === id);
+            if (item) {
+                const estAnt = item.estado;
+                
+                // Preparamos los datos a actualizar en la nube
+                let updates = {
+                    estado: nuevoEstado
+                };
+
+                if (nuevoEstado === 'Entregado' && !item.fechaSalida) {
+                    updates.fechaSalida = new Date().toISOString().split('T')[0];
+                }
+
+                // Clonamos la bitácora actual y agregamos el cambio de estado
+                let nuevaBitacora = item.bitacora ? [...item.bitacora] : [];
+                nuevaBitacora.push({ fecha: obtenerFechaHoraActual(), texto: `🔄 <b>Cambio de estado:</b> ${estAnt} ➝ ${nuevoEstado}` });
+                updates.bitacora = nuevaBitacora;
+
+                // Enviamos actualización a Firebase
+                db.ref('bodega_repuestos/' + id).update(updates);
+            }
+        }
+
+        function eliminarItem(id) {
+            if(confirm('¿Estás 100% seguro que deseas eliminar este repuesto de la base de datos? Esto afectará a todos los usuarios.')) {
+                db.ref('bodega_repuestos/' + id).remove();
+            }
+        }
+
+        // --- 7. LÓGICA DE MODALES ---
+        function abrirBitacora(id) {
+            idRepuestoActual = id;
+            const item = inventario.find(i => i.id === id);
+            document.getElementById('modalTituloId').innerText = item.numeroIngreso;
+            document.getElementById('nuevaObservacion').value = ''; 
+            
+            const caja = document.getElementById('cajaHistorial'); 
+            caja.innerHTML = ''; 
+            
+            if(item.bitacora) {
+                item.bitacora.forEach(e => {
+                    caja.innerHTML += `
+                        <div class="chat-row mb-2">
+                            <div class="d-flex justify-content-between small text-muted px-2 mb-1">
+                                <span><i class="fas fa-info-circle"></i> Sistema</span><span>${e.fecha}</span>
+                            </div>
+                            <div class="chat-bubble user w-100">${e.texto}</div>
+                        </div>`;
+                });
+            }
+            bitacoraModalInst.show();
+            setTimeout(() => caja.scrollTop = caja.scrollHeight, 200);
+        }
+
+        function guardarNuevaObservacion() {
+            const txt = document.getElementById('nuevaObservacion').value;
+            if (!txt.trim()) return;
+            
+            const item = inventario.find(i => i.id === idRepuestoActual);
+            let nuevaBitacora = item.bitacora ? [...item.bitacora] : [];
+            
+            nuevaBitacora.push({ fecha: obtenerFechaHoraActual(), texto: `💬 <b>Nota:</b> ${txt.replace(/\n/g, '<br>')}` });
+            
+            // Actualizamos solo la bitácora en la nube
+            db.ref('bodega_repuestos/' + idRepuestoActual).update({ bitacora: nuevaBitacora })
+                .then(() => {
+                    abrirBitacora(idRepuestoActual); // Recargamos el modal para ver el texto
+                }); 
+        }
+
+        function abrirQR(folio, nombre, np) {
+            const urlBuscador = `${window.location.href.split('?')[0]}?buscar=${folio}`;
+            const apiQR = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(urlBuscador)}&margin=10`;
+            
+            document.getElementById('qrTituloIngreso').innerText = folio;
+            document.getElementById('qrSubtitulo').innerText = `${nombre} (N/P: ${np})`;
+            document.getElementById('qrContenedor').innerHTML = `<img src="${apiQR}" alt="QR" width="180" height="180">`;
+            
+            qrModalInst.show();
+        }
+    </script>
+</body>
+</html>
